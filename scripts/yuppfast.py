@@ -8,230 +8,171 @@ playlist = ["#EXTM3U"]
 # Disable SSL warnings
 urllib3.disable_warnings()
 
-try:
-    print("Step 1: Getting token...")
-    resp = urllib3.request(
-        "GET",
-        "https://yuppfast-api.revlet.net/service/api/v1/get/token?tenant_code=yuppfast&box_id=3b6f5839-0b53-aa06-7a80-023047a6357c&product=yuppfast&device_id=5&device_sub_type=Chrome,145.0.0.0,Windows&client_app_version=1&timezone=Asia/Calcutta",
-        headers={
-            "Accept": "application/json, text/plain, */*",
-            "Accept-Encoding": "gzip, deflate, br, zstd",
-            "Tenant-Code": "yuppfast",
-            "Origin": "https://www.yupptv.com",
-            "Referer": "https://www.yupptv.com/",
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36",
-            "Connection": "close"
-        },
-        timeout=30
-    )
-    
-    if resp.status != 200:
-        print(f"Token request failed with status: {resp.status}")
-        exit(1)
-        
-    jsonresp = resp.json()
-    sessionid = jsonresp.get('response', {}).get('sessionId')
-    
-    if not sessionid:
-        print("Failed to get session ID")
-        exit(1)
-    
-    print(f"Token obtained. Session ID: {sessionid[:20]}...")
-    
-except Exception as e:
-    print(f"Error getting token: {str(e)}")
-    exit(1)
+print("Step 1: Getting token...")
+resp = urllib3.request(
+    "GET",
+    "https://yuppfast-api.revlet.net/service/api/v1/get/token?tenant_code=yuppfast&box_id=3b6f5839-0b53-aa06-7a80-023047a6357c&product=yuppfast&device_id=5&device_sub_type=Chrome,145.0.0.0,Windows&client_app_version=1&timezone=Asia/Calcutta",
+    headers={
+        "Accept": "application/json, text/plain, */*",
+        "Tenant-Code": "yuppfast",
+        "Origin": "https://www.yupptv.com",
+        "Referer": "https://www.yupptv.com/",
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+    }
+)
 
-try:
-    print("\nStep 2: Fetching channels...")
-    resp = urllib3.request(
-        "GET",
-        "https://yuppfast-api.revlet.net/service/api/v1/tvguide/channels?filter=genreCode:all;langCode:ENG,HIN,TAM,MAR,BEN,TEL,KAN,BHO,GUA,PUN,ASS,URD",
-        headers={
-            "Accept": "application/json, text/plain, */*",
-            "Accept-Encoding": "gzip, deflate, br, zstd",
-            "Box-Id": "3b6f5839-0b53-aa06-7a80-023047a6357c",
-            "Tenant-Code": "yuppfast",
-            "Origin": "https://www.yupptv.com",
-            "Referer": "https://www.yupptv.com/",
-            "Session-Id": sessionid,
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36",
-            "Connection": "close"
-        },
-        timeout=30
-    )
-    
-    if resp.status != 200:
-        print(f"Channels request failed with status: {resp.status}")
-        exit(1)
-        
-    jsonresp = resp.json()
-    channels = jsonresp.get('response', {}).get('data', [])
-    
-    if not channels:
-        print("No channels received from API")
-        exit(1)
-    
-    print(f"Found {len(channels)} channels")
-    
-except Exception as e:
-    print(f"Error fetching channels: {str(e)}")
-    exit(1)
+jsonresp = resp.json()
+sessionid = jsonresp['response']['sessionId']
+print(f"Session ID: {sessionid[:30]}...")
 
-# ============================================
-# LANGUAGE DETECTION
-# ============================================
+print("\nStep 2: Fetching channels...")
+resp = urllib3.request(
+    "GET",
+    "https://yuppfast-api.revlet.net/service/api/v1/tvguide/channels?filter=genreCode:all;langCode:ENG,HIN,TAM,MAR,BEN,TEL,KAN,BHO,GUA,PUN,ASS,URD",
+    headers={
+        "Accept": "application/json, text/plain, */*",
+        "Box-Id": "3b6f5839-0b53-aa06-7a80-023047a6357c",
+        "Tenant-Code": "yuppfast",
+        "Origin": "https://www.yupptv.com",
+        "Referer": "https://www.yupptv.com/",
+        "Session-Id": sessionid,
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+    }
+)
+
+jsonresp = resp.json()
+channels = jsonresp.get('response', {}).get('data', [])
+print(f"Found {len(channels)} channels")
+
+# Language detection function
 def detect_language(channel_name):
     name_lower = channel_name.lower()
     
-    if any(word in name_lower for word in ['tamil', 'polimer', 'puthiya thalaimurai', 'seithigal', 'sun tv', 'star vijay', 'kalaignar', 'raj tv', 'jaya tv', 'pothigai', 'zee tamil', 'colors tamil', 'madha tv', 'moon tv', 'murasu', 'news tamil']):
+    if any(word in name_lower for word in ['tamil', 'polimer', 'puthiya thalaimurai', 'seithigal']):
         return "TAM", "Tamil"
-    
-    if any(word in name_lower for word in ['telugu', 'etv', 'gemini', 'maa', 'zee telugu', 'vanitha', 'tv5', 't news', 'ntv', 'hmtv', 'v6 news', 'tv9 telugu', '10 tv', 'i news', 'sakshi', 'mahaa', 'cvr', 'big tv', 'svbc', 'tolly', 'prime9', 'manatv']):
+    if any(word in name_lower for word in ['telugu', 'etv', 'gemini', 'maa', 'vanitha', 'tv5', 'ntv', 'hmtv']):
         return "TEL", "Telugu"
-    
-    if any(word in name_lower for word in ['kannada', 'colors kannada', 'star suvarna', 'zee kannada', 'udaya', 'tv9 kannada', 'public tv', 'tv5 kannada']):
+    if any(word in name_lower for word in ['kannada', 'tv9 kannada', 'suvarna']):
         return "KAN", "Kannada"
-    
-    if any(word in name_lower for word in ['hindi', 'zee news', 'aaj tak', 'ndtv india', 'republic bharat', 'abp news', 'tv9 bharatvarsh', 'good news today', 'sudarshan', 'times now navbharat']):
+    if any(word in name_lower for word in ['hindi', 'zee news', 'aaj tak', 'ndtv', 'republic bharat']):
         return "HIN", "Hindi"
-    
-    if any(word in name_lower for word in ['bengali', 'star jalsha', 'zee bengali', 'tv9 bangla', 'republic bangla', 'kolkata tv', 'abp ananda', '24 ghanta']):
+    if any(word in name_lower for word in ['bengali', 'star jalsha', 'zee bengali']):
         return "BEN", "Bengali"
-    
-    if any(word in name_lower for word in ['marathi', 'zee marathi', 'star pravah', 'tv9 marathi', 'abp majha', 'jai maharashtra', '24 taas']):
+    if any(word in name_lower for word in ['marathi', 'zee marathi', 'abp majha']):
         return "MAR", "Marathi"
-    
-    if any(word in name_lower for word in ['punjabi', 'zee punjabi', 'ptc', 'gtc punjabi', 'wah punjabi']):
+    if any(word in name_lower for word in ['punjabi', 'zee punjabi', 'ptc']):
         return "PUN", "Punjabi"
-    
-    if any(word in name_lower for word in ['gujarati', 'tv9 gujarati', 'abp asmita', 'zee 24 kalak', 'gujarat first']):
+    if any(word in name_lower for word in ['gujarati', 'tv9 gujarati', 'abp asmita']):
         return "GUA", "Gujarati"
     
     return "ENG", "English"
 
-# ============================================
-# CATEGORY DETECTION
-# ============================================
+# Category detection function
 def detect_category(channel_name):
     name_lower = channel_name.lower()
     
-    if any(word in name_lower for word in ['news', 'times now', 'aaj tak', 'republic', 'ndtv', 'abp', 'tv9', 'india today', 'mirror now', 'wion']):
+    if any(word in name_lower for word in ['news', 'times now', 'aaj tak', 'republic', 'ndtv', 'abp']):
         return "News"
-    
-    if any(word in name_lower for word in ['sports', 'sport', 'cricket', 'willow', 'espn', 'star sports', 'fight', 'mma', 'hunt', 'fish', 'nautical', 'yachting', 'adventure']):
+    if any(word in name_lower for word in ['sports', 'sport', 'cricket', 'willow', 'fight', 'mma']):
         return "Sports"
-    
-    if any(word in name_lower for word in ['music', 'song', 'hits', 'bollywood', 'bhajan', 'devotional', 'sangeet', 'radio', 'balle balle']):
+    if any(word in name_lower for word in ['music', 'song', 'hits', 'bollywood']):
         return "Music"
-    
-    if any(word in name_lower for word in ['kids', 'cartoon', 'kiddo', 'hooray', 'rhymes', 'green gold']):
+    if any(word in name_lower for word in ['kids', 'cartoon', 'kiddo']):
         return "Kids"
-    
-    if any(word in name_lower for word in ['movie', 'films', 'cinema', 'hollywood', 'tolly', 'action', 'drama', 'thriller', 'horror']):
+    if any(word in name_lower for word in ['movie', 'films', 'cinema', 'action', 'drama']):
         return "Movies"
-    
-    if any(word in name_lower for word in ['spiritual', 'god', 'bhakti', 'temple', 'prayer', 'divya', 'krishna', 'sai', 'svbc', 'angel', 'hosanna']):
+    if any(word in name_lower for word in ['spiritual', 'god', 'bhakti', 'temple', 'svbc']):
         return "Spiritual"
-    
-    if any(word in name_lower for word in ['lifestyle', 'fashion', 'travel', 'food', 'health', 'fitness', 'vanitha']):
+    if any(word in name_lower for word in ['lifestyle', 'fashion', 'travel', 'health']):
         return "Lifestyle"
-    
-    if any(word in name_lower for word in ['education', 'learning', 'school', 'college', 'turito', 'iit', 'neet', 'tsat']):
+    if any(word in name_lower for word in ['education', 'learning', 'turito']):
         return "Education"
     
     return "Entertainment"
 
-print("\nStep 3: Processing channels...")
+print("\nStep 3: Fetching stream URLs...")
 print("="*60)
 
-channel_counter = 1
-processed = 0
-failed = 0
+success_count = 0
+failed_count = 0
 
-for channel in channels:
+for idx, channel in enumerate(channels[:50], 1):  # Process first 50 channels for testing
     try:
-        # Extract channel information
+        # Get channel path
         path = channel.get('target', {}).get('path', '')
         if not path:
+            print(f"  {idx}. No path found for channel {channel.get('id', 'Unknown')}")
             continue
             
-        epg = channel.get('id', '')
         name = channel.get('display', {}).get('title', 'Unknown')
+        epg = channel.get('id', '')
         logo = channel.get('display', {}).get('imageUrl', '').replace("common,", "https://d229kpbsb5jevy.cloudfront.net/yuppfast/content/common/")
         
-        # Detect language and category
+        # Get language and category
         lang_code, lang_name = detect_language(name)
         category = detect_category(name)
-        
-        # Create group title
         group_title = f"{lang_name} {category}" if lang_name != "English" else category
         
         # Add EXTINF line
-        playlist.append(f'#EXTINF:-1 tvg-id="{epg}" tvg-chno="{channel_counter}" tvg-name="{name}" tvg-logo="{logo}" tvg-language="{lang_code}" group-title="{group_title}",{channel_counter} {name}')
+        playlist.append(f'#EXTINF:-1 tvg-id="{epg}" tvg-chno="{idx}" tvg-name="{name}" tvg-logo="{logo}" tvg-language="{lang_code}" group-title="{group_title}",{idx} {name}')
         
-        # Get stream URL
+        # Fetch stream URL
         encodedpath = urllib.parse.quote_plus(path)
+        stream_resp = urllib3.request(
+            "GET",
+            f"https://yuppfast-api.revlet.net/service/api/v1/page/stream?path={encodedpath}",
+            headers={
+                "Accept": "application/json, text/plain, */*",
+                "Box-Id": "3b6f5839-0b53-aa06-7a80-023047a6357c",
+                "Tenant-Code": "yuppfast",
+                "Session-Id": sessionid,
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
+            },
+            timeout=10
+        )
         
-        try:
-            stream_resp = urllib3.request(
-                "GET",
-                f"https://yuppfast-api.revlet.net/service/api/v1/page/stream?path={encodedpath}",
-                headers={
-                    "Accept": "application/json, text/plain, */*",
-                    "Box-Id": "3b6f5839-0b53-aa06-7a80-023047a6357c",
-                    "Tenant-Code": "yuppfast",
-                    "Session-Id": sessionid,
-                    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"
-                },
-                timeout=15
-            )
+        if stream_resp.status == 200:
+            stream_data = stream_resp.json()
+            print(f"  {idx}. {name[:30]} - API Response: {stream_data.get('status')}")
             
-            if stream_resp.status == 200:
-                stream_data = stream_resp.json()
-                if stream_data.get('status') == True:
-                    streams = stream_data.get('response', {}).get('streams', [])
-                    if streams and streams[0].get('url'):
-                        playlist.append(streams[0]['url'])
-                    else:
-                        playlist.append('')
-                        failed += 1
+            if stream_data.get('status') == True:
+                streams = stream_data.get('response', {}).get('streams', [])
+                if streams and streams[0].get('url'):
+                    stream_url = streams[0]['url']
+                    playlist.append(stream_url)
+                    success_count += 1
+                    print(f"      ✓ Got stream URL")
                 else:
-                    playlist.append('')
-                    failed += 1
+                    playlist.append('# No stream URL found')
+                    failed_count += 1
+                    print(f"      ✗ No stream URL in response")
             else:
-                playlist.append('')
-                failed += 1
-                
-        except Exception as e:
-            print(f"  Stream error for {name}: {str(e)[:50]}")
-            playlist.append('')
-            failed += 1
+                playlist.append('# Stream API returned false')
+                failed_count += 1
+                print(f"      ✗ API returned status false")
+        else:
+            playlist.append(f'# HTTP {stream_resp.status} error')
+            failed_count += 1
+            print(f"      ✗ HTTP {stream_resp.status}")
         
-        processed += 1
-        channel_counter += 1
-        
-        if processed % 10 == 0:
-            print(f"  Processed {processed} channels...")
-        
-        time.sleep(0.1)  # Small delay to avoid rate limiting
+        time.sleep(0.1)
         
     except Exception as e:
-        print(f"Error processing channel: {str(e)[:100]}")
-        failed += 1
+        print(f"  {idx}. Error: {str(e)[:80]}")
+        playlist.append(f'# Error: {str(e)[:50]}')
+        failed_count += 1
         continue
 
-# Write the playlist file
-print("\nStep 4: Saving playlist...")
+print("\n" + "="*60)
+print(f"RESULTS:")
+print(f"  Successfully fetched streams: {success_count}")
+print(f"  Failed to fetch streams: {failed_count}")
+print(f"  Total channels processed: {success_count + failed_count}")
+
+# Save the playlist
 with open('./yupptvfast.m3u', 'w', encoding='utf-8') as f:
     for line in playlist:
         f.write(f'{line}\n')
 
-print("="*60)
-print(f"✅ Playlist generated successfully!")
-print(f"📁 File saved as: yupptvfast.m3u")
-print(f"📊 Statistics:")
-print(f"   Total channels in playlist: {processed}")
-print(f"   Channels with stream URLs: {processed - failed}")
-print(f"   Channels without streams: {failed}")
-print("="*60)
+print(f"\n✅ Playlist saved as: yupptvfast.m3u")
+print(f"📊 Check the file - stream URLs are now included")
