@@ -12,7 +12,7 @@ HEADERS = {
     "Tenant-Code": "yuppfast",
     "Origin": "https://www.yupptv.com",
     "Referer": "https://www.yupptv.com/",
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 Chrome/120.0.0.0 Safari/537.36"
 }
 
 # =========================
@@ -31,8 +31,12 @@ token_url = (
 )
 
 resp = http.request("GET", token_url, headers=HEADERS)
-data = json.loads(resp.data.decode("utf-8"))
-sessionid = data["response"]["sessionId"]
+
+try:
+    data = json.loads(resp.data.decode("utf-8"))
+    sessionid = data["response"]["sessionId"]
+except:
+    raise Exception("Failed to fetch session token")
 
 # =========================
 # CHANNEL LIST
@@ -51,14 +55,18 @@ channels_url = (
 )
 
 resp = http.request("GET", channels_url, headers=channel_headers)
-channels = json.loads(resp.data.decode("utf-8"))
+
+try:
+    channels = json.loads(resp.data.decode("utf-8"))
+except:
+    raise Exception("Failed to fetch channels")
 
 # =========================
-# STREAM SELECTOR
+# STREAM SELECTOR (FIXED)
 # =========================
 
 def get_best_stream(streams):
-    if not streams:
+    if not isinstance(streams, list) or len(streams) == 0:
         return ""
 
     best = ""
@@ -98,14 +106,18 @@ def get_best_stream(streams):
 # PROCESS CHANNELS
 # =========================
 
-for c in channels["response"]["data"]:
+for c in channels.get("response", {}).get("data", []):
 
     try:
-        path = c["target"]["path"]
-        epg = c["id"]
-        name = c["display"]["title"]
+        path = c.get("target", {}).get("path")
+        epg = c.get("id", "")
+        name = c.get("display", {}).get("title", "")
+        image = c.get("display", {}).get("imageUrl", "")
 
-        logo = c["display"]["imageUrl"].replace(
+        if not path or not name:
+            continue
+
+        logo = image.replace(
             "common,",
             "https://d229kpbsb5jevy.cloudfront.net/yuppfast/content/common/"
         )
@@ -118,13 +130,36 @@ for c in channels["response"]["data"]:
         )
 
         resp = http.request("GET", stream_url, headers=channel_headers)
-        stream_data = json.loads(resp.data.decode("utf-8"))
+
+        try:
+            stream_data = json.loads(resp.data.decode("utf-8"))
+        except:
+            stream_data = {}
 
         final_stream = ""
 
-        if stream_data.get("status") and stream_data.get("response"):
-            streams = stream_data["response"].get("streams", [])
-            final_stream = get_best_stream(streams)
+        if stream_data.get("status") is True:
+
+            response = stream_data.get("response", {})
+
+            streams = response.get("streams")
+
+            # CASE 1
+            if isinstance(streams, list) and len(streams) > 0:
+                final_stream = get_best_stream(streams)
+
+            # CASE 2 fallback
+            elif isinstance(response, dict):
+                final_stream = (
+                    response.get("url")
+                    or response.get("streamUrl")
+                    or response.get("playUrl")
+                    or ""
+                )
+
+        # skip empty streams
+        if not final_stream:
+            continue
 
         playlist.append(
             f'#EXTINF:-1 tvg-id="{epg}" tvg-name="{name}" tvg-logo="{logo}",{name}'
@@ -134,7 +169,7 @@ for c in channels["response"]["data"]:
         print("Added:", name)
 
     except Exception as e:
-        print("Error:", e)
+        print("Error channel:", str(e))
 
 # =========================
 # WRITE FILE
@@ -143,4 +178,4 @@ for c in channels["response"]["data"]:
 with open("yupptvfast.m3u", "w", encoding="utf-8") as f:
     f.write("\n".join(playlist))
 
-print("DONE")
+print("DONE - Playlist Generated")
