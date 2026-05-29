@@ -1,4 +1,3 @@
-```python
 import urllib3
 import urllib
 import json
@@ -312,4 +311,3 @@ with open(
         f.write(f"{line}\n")
 
 print("Playlist updated successfully")
-```
