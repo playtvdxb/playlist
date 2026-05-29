@@ -1,28 +1,44 @@
-name: Update Live Playlist
+name: Generate YuppTV Fast playlist
 
 on:
   schedule:
-    - cron: "0 */6 * * *"
-  workflow_dispatch:
+    - cron: '*/30 * * * *'  # Runs every 30 minutes
+  push:
+    branches:
+      - main  # Runs on push to the main branch
+  workflow_dispatch:  # Allows manual triggering of the workflow
 
 jobs:
-  update:
+  build:
     runs-on: ubuntu-latest
+    permissions:
+      contents: write
     steps:
-    - uses: actions/checkout@v4
-    - name: Setup Python
-      uses: actions/setup-python@v5
-      with:
-        python-version: '3.9'
-    - name: Install dependencies
-      run: |
-        pip install urllib3
-    - name: Run script
-      run: python scripts/yuppfast.py  # <-- Make sure this path is correct
-    - name: Commit and push
-      run: |
-        git config --global user.name "GitHub Actions"
-        git config --global user.email "actions@github.com"
-        git add yupptvfast.m3u
-        git diff --quiet && git diff --staged --quiet || git commit -m "Auto-update playlist [skip ci]"
-        git push
+      - name: Checkout repository
+        uses: actions/checkout@v6.0.2
+
+      - name: Set up Python
+        uses: actions/setup-python@v6.2.0
+        with:
+          python-version: '3.x'
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install urllib3
+
+      - name: Run script
+        run: "python ./scripts/yuppfast.py"
+
+      - name: Commit changes if any
+        run: |
+          git config --global user.email "action@github.com"
+          git config --global user.name "GitHub Action"
+          git add -A
+          git diff --quiet && git diff --staged --quiet || git commit -m "Playlist auto-updated on $(date -u '+%Y-%m-%d %H:%M:%S UTC')"
+
+      - name: Pull latest changes from remote
+        run: git pull origin main --rebase
+
+      - name: Push changes
+        run: git push origin main
