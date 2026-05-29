@@ -2,29 +2,24 @@ name: Update Live Playlist
 
 on:
   schedule:
-    - cron: "0 */6 * * *"  # Updates every 6 hours
-  workflow_dispatch:  # Manual trigger button
+    - cron: "0 */6 * * *"
+  workflow_dispatch:
 
 jobs:
   update:
     runs-on: ubuntu-latest
-    
     steps:
     - uses: actions/checkout@v4
-    
     - name: Setup Python
       uses: actions/setup-python@v5
       with:
         python-version: '3.9'
-    
     - name: Install dependencies
       run: |
         pip install urllib3
-    
-    - name: Run playlist generator
-      run: python yuppfast.py
-    
-    - name: Commit and push changes
+    - name: Run script
+      run: python scripts/yuppfast.py  # <-- Make sure this path is correct
+    - name: Commit and push
       run: |
         git config --global user.name "GitHub Actions"
         git config --global user.email "actions@github.com"
