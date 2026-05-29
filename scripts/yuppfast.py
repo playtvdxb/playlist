@@ -311,3 +311,4 @@ with open(
         f.write(f"{line}\n")
 
 print("Playlist updated successfully")
+
