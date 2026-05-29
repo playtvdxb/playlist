@@ -1,77 +1,131 @@
 import urllib3
-import urllib
+import urllib.parse
 import json
-import time
+
+# =========================
+# INIT
+# =========================
+http = urllib3.PoolManager()
 playlist = ["#EXTM3U"]
 
-resp = urllib3.request(
+allowed_langs = {
+    "ENG", "HIN", "TAM", "MAR", "BEN", "TEL",
+    "KAN", "BHO", "GUA", "PUN", "ASS", "URD"
+}
+
+# =========================
+# TOKEN REQUEST
+# =========================
+token_url = "https://yuppfast-api.revlet.net/service/api/v1/get/token?tenant_code=yuppfast&box_id=3b6f5839-0b53-aa06-7a80-023047a6357c&product=yuppfast&device_id=5&display_lang_code=ENG&device_sub_type=Chrome,145.0.0.0,Windows&client_app_version=1&timezone=Asia/Calcutta"
+
+token_resp = http.request(
     "GET",
-    "https://yuppfast-api.revlet.net/service/api/v1/get/token?tenant_code=yuppfast&box_id=3b6f5839-0b53-aa06-7a80-023047a6357c&product=yuppfast&device_id=5&display_lang_code=ENG&device_sub_type=Chrome,145.0.0.0,Windows&client_app_version=1&timezone=Asia/Calcutta",
+    token_url,
     headers={
         "Accept": "application/json, text/plain, */*",
-        "Accept-Encoding": "gzip, deflate, br, zstd",
         "Tenant-Code": "yuppfast",
         "Origin": "https://www.yupptv.com",
         "Referer": "https://www.yupptv.com/",
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36"
+        "User-Agent": "Mozilla/5.0"
     }
 )
 
-jsonresp = resp.json()
+token_data = json.loads(token_resp.data.decode("utf-8"))
+sessionid = token_data["response"]["sessionId"]
 
-sessionid = jsonresp['response']['sessionId']
+# =========================
+# CHANNEL LIST
+# =========================
+channels_url = "https://yuppfast-api.revlet.net/service/api/v1/tvguide/channels?filter=genreCode:all;langCode:ENG,HIN,TAM,MAR,BEN,TEL,KAN,BHO,GUA,PUN,ASS,URD"
 
-resp = urllib3.request(
+channels_resp = http.request(
     "GET",
-    "https://yuppfast-api.revlet.net/service/api/v1/tvguide/channels?filter=genreCode:all;langCode:ENG,HIN,TAM,MAR,BEN,TEL,KAN,BHO,GUA,PUN,ASS,URD",
+    channels_url,
     headers={
         "Accept": "application/json, text/plain, */*",
-        "Accept-Encoding": "gzip, deflate, br, zstd",
-        "Box-Id": "3b6f5839-0b53-aa06-7a80-023047a6357c",
         "Tenant-Code": "yuppfast",
+        "Box-Id": "3b6f5839-0b53-aa06-7a80-023047a6357c",
         "Origin": "https://www.yupptv.com",
         "Referer": "https://www.yupptv.com/",
         "Session-Id": sessionid,
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36"
+        "User-Agent": "Mozilla/5.0"
     }
 )
 
-jsonresp = resp.json()
+channels_data = json.loads(channels_resp.data.decode("utf-8"))
 
-for i in jsonresp['response']['data']:
-    stringdata = json.dumps(i, indent=4)
-    channel_data = json.loads(stringdata)
-    path = channel_data['target']['path']
-    epg = channel_data['id']
-    name = channel_data['display']['title']
-    logo = channel_data['display']['imageUrl'].replace("common,", "https://d229kpbsb5jevy.cloudfront.net/yuppfast/content/common/")
-    playlist.append(f'#EXTINF:-1 tvg-id="{epg}" tvg-chno="{epg}" tvg-name="{name}" tvg-logo="{logo}",{epg} {name}')
-    encodedpath = urllib.parse.quote_plus(path)
-    resp = urllib3.request(
-        "GET",
-        f"https://yuppfast-api.revlet.net/service/api/v1/page/stream?path={encodedpath}",
-        headers={
-            "Accept": "application/json, text/plain, */*",
-            "Accept-Encoding": "gzip, deflate, br, zstd",
-            "Box-Id": "3b6f5839-0b53-aa06-7a80-023047a6357c",
-            "Tenant-Code": "yuppfast",
-            "Origin": "https://www.yupptv.com",
-            "Referer": "https://www.yupptv.com/",
-            "Session-Id": sessionid,
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36"
-        }
-    )
-    stream = resp.json()
-    if stream['status'] == True:
-        for j in stream['response']['streams']:
-            streamlinks = []
-            streamlinks.append(j['url'])
-        playlist.append(streamlinks[0])
-    else:
-        playlist.append('')
+# =========================
+# PROCESS CHANNELS
+# =========================
+for ch in channels_data["response"]["data"]:
 
-with open('./yupptvfast.m3u', 'w', newline='') as f:
-    for lines in playlist:
-        f.write(f'{lines}\n')
+    try:
+        lang = ch.get("langCode") or ch.get("display", {}).get("langCode")
 
-f.close()
+        if lang not in allowed_langs:
+            continue
+
+        path = ch["target"]["path"]
+        epg = ch["id"]
+        name = ch["display"]["title"]
+
+        logo = ch["display"]["imageUrl"]
+        logo = logo.replace(
+            "common,",
+            "https://d229kpbsb5jevy.cloudfront.net/yuppfast/content/common/"
+        )
+
+        # M3U metadata
+        playlist.append(
+            f'#EXTINF:-1 tvg-id="{epg}" tvg-name="{name}" tvg-logo="{logo}",{name}'
+        )
+
+        encodedpath = urllib.parse.quote_plus(path)
+
+        # =========================
+        # STREAM REQUEST
+        # =========================
+        stream_resp = http.request(
+            "GET",
+            f"https://yuppfast-api.revlet.net/service/api/v1/page/stream?path={encodedpath}",
+            headers={
+                "Accept": "application/json, text/plain, */*",
+                "Tenant-Code": "yuppfast",
+                "Box-Id": "3b6f5839-0b53-aa06-7a80-023047a6357c",
+                "Origin": "https://www.yupptv.com",
+                "Referer": "https://www.yupptv.com/",
+                "Session-Id": sessionid,
+                "Accept-Language": lang.lower() if lang else "eng",
+                "User-Agent": "Mozilla/5.0"
+            }
+        )
+
+        stream_json = json.loads(stream_resp.data.decode("utf-8"))
+
+        # FIX: collect all URLs properly
+        if stream_json.get("status") is True:
+            streams = stream_json.get("response", {}).get("streams", [])
+
+            urls = [s.get("url") for s in streams if s.get("url")]
+
+            if urls:
+                playlist.append(urls[0])
+            else:
+                playlist.append("")
+
+        else:
+            playlist.append("")
+
+    except Exception:
+        # Never break playlist generation
+        playlist.append("")
+        continue
+
+# =========================
+# SAVE FILE
+# =========================
+with open("yupptvfast.m3u", "w", encoding="utf-8") as f:
+    for line in playlist:
+        f.write(line + "\n")
+
+print("M3U playlist generated successfully!")
