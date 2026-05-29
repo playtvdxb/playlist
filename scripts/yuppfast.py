@@ -25,9 +25,10 @@ resp = urllib3.request(
 jsonresp = resp.json()
 sessionid = jsonresp['response']['sessionId']
 
+# FIXED: Added MAL (Malayalam) to the language filter
 resp = urllib3.request(
     "GET",
-    "https://yuppfast-api.revlet.net/service/api/v1/tvguide/channels?filter=genreCode:all;langCode:ENG,HIN,TAM,MAR,BEN,TEL,KAN,BHO,GUA,PUN,ASS,URD",
+    "https://yuppfast-api.revlet.net/service/api/v1/tvguide/channels?filter=genreCode:all;langCode:ENG,HIN,TAM,MAR,BEN,TEL,KAN,MAL,BHO,GUA,PUN,ASS,URD",
     headers={
         "Accept": "application/json, text/plain, */*",
         "Accept-Encoding": "gzip, deflate, br, zstd",
@@ -42,13 +43,13 @@ resp = urllib3.request(
 
 jsonresp = resp.json()
 
-# Language mapping
+# Language mapping with Malayalam
 language_map = {
     "ENG": "English",
     "HIN": "Hindi",
     "TAM": "Tamil",
     "TEL": "Telugu",
-    "MAL": "Malayalam",
+    "MAL": "Malayalam",  # Added Malayalam
     "KAN": "Kannada",
     "BEN": "Bengali",
     "MAR": "Marathi",
@@ -59,57 +60,133 @@ language_map = {
     "ASS": "Assamese"
 }
 
-# Function to detect language from channel name
-def detect_language_from_name(channel_name):
-    channel_name_lower = channel_name.lower()
+# Comprehensive language detection function
+def detect_language(channel_name):
+    name_lower = channel_name.lower()
+    
+    # Malayalam detection (HIGHEST PRIORITY - added many keywords)
+    malayalam_keywords = [
+        'malayalam', 'mal', 'asianet', 'mazhavil', 'manorama', 'flowers', 'amrita', 
+        'reporter', 'kairali', 'mediaone', 'jaihind', 'janam', 'kaumudy', 'shalom', 
+        'mangalam', 'mathrubhumi', 'news18 malayalam', 'zee keralam', 'surya tv',
+        'kerala vision', 'darshana tv', 'harvest tv', 'goodness tv', 'power vision'
+    ]
+    for keyword in malayalam_keywords:
+        if keyword in name_lower:
+            return "MAL", "Malayalam"
     
     # Telugu detection
-    if any(word in channel_name_lower for word in ['telugu', 'tel', 'zee telugu', 'etv telugu', 'gemini', 'maa', 'star maa']):
-        return "TEL", "Telugu"
+    telugu_keywords = [
+        'telugu', 'etv', 'gemini', 'maa', 'zee telugu', 'vanitha', 'tv5', 't news', 
+        'ntv', 'hmtv', 'studio n', 'suma news', 'v6 news', 'tv9 telugu', '10 tv', 
+        'i news', 'raj news telugu', 'sakshi', 'mahaa', 'cvr', 'big tv', 'bhakti tv',
+        'svbc', 'tolly', 'telugu one', 'prime9', 'manatv', 'tsat', 'brk news'
+    ]
+    for keyword in telugu_keywords:
+        if keyword in name_lower:
+            return "TEL", "Telugu"
     
     # Tamil detection
-    if any(word in channel_name_lower for word in ['tamil', 'tam', 'sun tv', 'star vijay', 'kalaignar', 'raj tv', 'jaya tv', 'pothigai', 'polimer']):
-        return "TAM", "Tamil"
-    
-    # Malayalam detection
-    if any(word in channel_name_lower for word in ['malayalam', 'mal', 'malayalam', 'asianet', 'mazhavil', 'manorama', 'flowers', 'amrita', 'reporter', 'kairali', 'mediaone', 'jaihind']):
-        return "MAL", "Malayalam"
+    tamil_keywords = [
+        'tamil', 'sun tv', 'star vijay', 'kalaignar', 'raj tv', 'jaya tv', 'pothigai', 
+        'polimer', 'zee tamil', 'colors tamil', 'news tamil', 'puthiya thalaimurai',
+        'seithigal', 'madha tv', 'sivan temple', 'nambikkai', 'athavan', 'moon tv',
+        'peppers tv', 'ibc radio', 'murasu', 'thalaa'
+    ]
+    for keyword in tamil_keywords:
+        if keyword in name_lower:
+            return "TAM", "Tamil"
     
     # Kannada detection
-    if any(word in channel_name_lower for word in ['kannada', 'kan', 'colors kannada', 'star suvarna', 'zee kannada', 'udaya', 'tv9 kannada', 'public tv']):
-        return "KAN", "Kannada"
+    kannada_keywords = [
+        'kannada', 'colors kannada', 'star suvarna', 'zee kannada', 'udaya', 'tv9 kannada',
+        'public tv', 'news18 kannada', 'kasthuri', 'tv5 kannada', 'suvarna news'
+    ]
+    for keyword in kannada_keywords:
+        if keyword in name_lower:
+            return "KAN", "Kannada"
     
     # Hindi detection
-    if any(word in channel_name_lower for word in ['hindi', 'hin', 'zee news hindi', 'ndtv india', 'aaj tak', 'zeetv', 'star bharat', 'colors', 'sony', 'sab tv', '&tv', 'news18 india']):
-        return "HIN", "Hindi"
+    hindi_keywords = [
+        'hindi', 'zee news', 'aaj tak', 'ndtv india', 'republic bharat', 'news18', 
+        'abp news', 'tv9 bharatvarsh', 'times now navbharat', 'good news today',
+        'zeetv', 'star bharat', 'colors', 'sony', 'sab tv', '&tv', 'india tv',
+        'sudarshan news', 'khabar', 'bharat', 'aaj ki khabar', 'c news bharat'
+    ]
+    for keyword in hindi_keywords:
+        if keyword in name_lower:
+            return "HIN", "Hindi"
     
     # Bengali detection
-    if any(word in channel_name_lower for word in ['bengali', 'ben', 'star jalsha', 'zee bengali', 'colors bangla', 'sangeet bangla', 'tv9 bangla', 'republic bangla']):
-        return "BEN", "Bengali"
+    bengali_keywords = [
+        'bengali', 'star jalsha', 'zee bengali', 'colors bangla', 'sangeet bangla', 
+        'tv9 bangla', 'republic bangla', 'news live bangla', 'kolkata tv', 'rplus',
+        'abp ananda', '24 ghanta', 'calcuttanews', 'ctvn'
+    ]
+    for keyword in bengali_keywords:
+        if keyword in name_lower:
+            return "BEN", "Bengali"
     
     # Marathi detection
-    if any(word in channel_name_lower for word in ['marathi', 'mar', 'zee marathi', 'star pravah', 'colors marathi', 'saam tv', 'tv9 marathi', 'abp majha']):
-        return "MAR", "Marathi"
+    marathi_keywords = [
+        'marathi', 'zee marathi', 'star pravah', 'colors marathi', 'saam tv', 
+        'tv9 marathi', 'abp majha', 'jai maharashtra', '24 taas', 'fakt marathi'
+    ]
+    for keyword in marathi_keywords:
+        if keyword in name_lower:
+            return "MAR", "Marathi"
     
     # Punjabi detection
-    if any(word in channel_name_lower for word in ['punjabi', 'pun', 'zee punjabi', 'ptc', 'chardikla', 'pitara']):
-        return "PUN", "Punjabi"
+    punjabi_keywords = [
+        'punjabi', 'zee punjabi', 'ptc', 'chardikla', 'pitara', 'gtc punjabi',
+        'punjabi hits', 'tabbar hits', 'wpn', 'rozana spokesman', 'wah punjabi'
+    ]
+    for keyword in punjabi_keywords:
+        if keyword in name_lower:
+            return "PUN", "Punjabi"
     
     # Gujarati detection
-    if any(word in channel_name_lower for word in ['gujarati', 'guj', 'colors gujarati', 'tv9 gujarat', 'zee gujarati']):
-        return "GUA", "Gujarati"
+    gujarati_keywords = [
+        'gujarati', 'colors gujarati', 'tv9 gujarati', 'zee gujarati', 'abp asmita',
+        'zee 24 kalak', 'mantavya news', 'vtv gujarati', 'gujarat first'
+    ]
+    for keyword in gujarati_keywords:
+        if keyword in name_lower:
+            return "GUA", "Gujarati"
     
-    # English detection
-    if any(word in channel_name_lower for word in ['bbc', 'cnn', 'news18', 'times now', 'republic', 'ndtv 24x7', 'mirror now']):
-        return "ENG", "English"
+    # Bhojpuri detection
+    bhojpuri_keywords = ['bhojpuri', 'mahua', 'pasand']
+    for keyword in bhojpuri_keywords:
+        if keyword in name_lower:
+            return "BHO", "Bhojpuri"
     
-    # Default to English if no match found
-    return "ENG", "English"
+    # Assamese detection
+    assamese_keywords = ['assamese', 'nktv', 'rengoni', 'protidin']
+    for keyword in assamese_keywords:
+        if keyword in name_lower:
+            return "ASS", "Assamese"
+    
+    # Urdu detection
+    urdu_keywords = ['urdu', 'zee salaam', 'etv urdu']
+    for keyword in urdu_keywords:
+        if keyword in name_lower:
+            return "URD", "Urdu"
+    
+    # Default to English for international/news channels
+    english_keywords = ['bbc', 'cnn', 'wion', 'ndtv', 'mirror now', 'india today', 
+                        'republic tv', 'times now', 'news9', 'willow sports']
+    for keyword in english_keywords:
+        if keyword in name_lower:
+            return "ENG", "English"
+    
+    # If no match, return None (will use API value)
+    return None, None
 
 print("Fetching channels and detecting languages...")
 channel_counter = 1
 processed = 0
 language_stats = {}
+corrected_count = 0
 
 for i in jsonresp['response']['data']:
     try:
@@ -125,35 +202,22 @@ for i in jsonresp['response']['data']:
         name = channel_data.get('display', {}).get('title', 'Unknown')
         logo = channel_data.get('display', {}).get('imageUrl', '').replace("common,", "https://d229kpbsb5jevy.cloudfront.net/yuppfast/content/common/")
         
-        # DETECT LANGUAGE FROM CHANNEL NAME (Primary method)
-        lang_code, lang_name = detect_language_from_name(name)
+        # Get API language
+        api_lang_code = channel_data.get('langCode', 'ENG')
+        api_lang_name = language_map.get(api_lang_code, "English")
         
-        # If API provides language, use it as secondary check
-        api_lang = channel_data.get('langCode', '')
-        if api_lang and api_lang in language_map:
-            api_lang_name = language_map[api_lang]
-            # If API says English but name suggests Telugu, trust the name
-            if api_lang_name == "English" and lang_name != "English":
-                pass  # Keep the name-detected language
-            else:
-                lang_code = api_lang
-                lang_name = api_lang_name
+        # Detect language from channel name
+        detected_lang_code, detected_lang_name = detect_language(name)
         
-        # Special override for known Telugu channels
-        telugu_keywords = ['etv', 'gemini', 'maa', 'zee telugu', 'vanitha', 'tv5', 't news', 'ntv', 'hmtv', 'studio n', 'suma news', 'v6 news', 'tv9 telugu', '10 tv', 'i news', 'raj news telugu']
-        for keyword in telugu_keywords:
-            if keyword in name.lower():
-                lang_code = "TEL"
-                lang_name = "Telugu"
-                break
-        
-        # Special override for known Tamil channels
-        tamil_keywords = ['sun tv', 'star vijay', 'kalaignar', 'raj tv', 'jaya tv', 'pothigai', 'polimer', 'zee tamil', 'colors tamil']
-        for keyword in tamil_keywords:
-            if keyword in name.lower():
-                lang_code = "TAM"
-                lang_name = "Tamil"
-                break
+        # Use detected language if found, otherwise use API language
+        if detected_lang_code:
+            lang_code = detected_lang_code
+            lang_name = detected_lang_name
+            if api_lang_name != detected_lang_name:
+                corrected_count += 1
+        else:
+            lang_code = api_lang_code
+            lang_name = api_lang_name
         
         # Track language statistics
         if lang_name not in language_stats:
@@ -163,7 +227,7 @@ for i in jsonresp['response']['data']:
         # Use channel number from API or generate one
         channel_number = channel_data.get('channelNumber', str(channel_counter))
         
-        # Create the EXTINF line with CORRECT language
+        # Create the EXTINF line
         playlist.append(f'#EXTINF:-1 tvg-id="{epg}" tvg-chno="{channel_number}" tvg-name="{name}" tvg-logo="{logo}" tvg-language="{lang_code}" group-title="{lang_name}",{channel_number} {name}')
         
         # Get stream URL
@@ -199,7 +263,7 @@ for i in jsonresp['response']['data']:
         if processed % 20 == 0:
             print(f"Processed {processed} channels...")
         
-        time.sleep(0.05)  # Small delay to avoid rate limiting
+        time.sleep(0.05)
         
     except Exception as e:
         print(f"Error processing channel: {str(e)}")
@@ -212,14 +276,14 @@ print("="*50)
 for lang, count in sorted(language_stats.items(), key=lambda x: x[1], reverse=True):
     print(f"{lang}: {count} channels")
 print("="*50)
+print(f"Channels corrected from API default: {corrected_count}")
+print(f"Total channels processed: {processed}")
 
 # Write the playlist file
 with open('./yupptvfast.m3u', 'w', encoding='utf-8', newline='') as f:
     for lines in playlist:
         f.write(f'{lines}\n')
 
-print(f"\n✅ Playlist generated successfully with {processed} channels")
+print(f"\n✅ Playlist generated successfully!")
 print(f"📁 File saved as: yupptvfast.m3u")
-print(f"\n📊 Language breakdown:")
-for lang, count in sorted(language_stats.items(), key=lambda x: x[1], reverse=True):
-    print(f"   {lang}: {count} channels")
+print(f"\n💡 Note: Added MAL (Malayalam) to language filter")
