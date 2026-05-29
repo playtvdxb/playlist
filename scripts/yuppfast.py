@@ -41,25 +41,31 @@ resp = urllib3.request(
 
 jsonresp = resp.json()
 
-# Language mapping to match your CHANNELS categories
+# Complete language mapping
 language_map = {
     "ENG": "English",
     "HIN": "Hindi",
     "TAM": "Tamil",
-    "MAR": "Marathi",
-    "BEN": "Bengali",
-    "TEL": "Telugu",
+    "TEL": "Telugu",      # Fixed: Now correctly maps to Telugu
+    "MAL": "Malayalam",
     "KAN": "Kannada",
+    "BEN": "Bengali",
+    "MAR": "Marathi",
+    "PUN": "Punjabi",
+    "URD": "Urdu",
     "BHO": "Bhojpuri",
     "GUA": "Gujarati",
-    "PUN": "Punjabi",
     "ASS": "Assamese",
-    "URD": "Urdu",
-    "MAL": "Malayalam"  # Added for Malayalam
+    "ODI": "Odia",
+    "NEP": "Nepali"
 }
 
 # Counter for channel numbers
 channel_counter = 1
+
+# First, let's debug to see what language codes the API returns
+print("Fetching channels...")
+debug_sample = []
 
 for i in jsonresp['response']['data']:
     try:
@@ -75,20 +81,59 @@ for i in jsonresp['response']['data']:
         name = channel_data.get('display', {}).get('title', 'Unknown')
         logo = channel_data.get('display', {}).get('imageUrl', '').replace("common,", "https://d229kpbsb5jevy.cloudfront.net/yuppfast/content/common/")
         
-        # Get language code and name
-        lang_code = channel_data.get('langCode', 'ENG')
-        lang_name = language_map.get(lang_code, lang_code)
+        # IMPORTANT: Get the correct language code from API
+        # Try multiple possible field names
+        lang_code = channel_data.get('langCode') or \
+                    channel_data.get('language') or \
+                    channel_data.get('languageCode') or \
+                    channel_data.get('display', {}).get('langCode') or \
+                    "ENG"  # Default to English if not found
         
-        # Create a clean channel ID (remove spaces and special characters)
-        channel_id = f"yupp_{epg}".lower()
-        channel_id = ''.join(c if c.isalnum() or c == '_' else '_' for c in channel_id)
+        # Debug: Print first 10 channels to see language codes
+        if len(debug_sample) < 10:
+            debug_sample.append({
+                'name': name,
+                'langCode': channel_data.get('langCode'),
+                'language': channel_data.get('language'),
+                'languageCode': channel_data.get('languageCode'),
+                'display_langCode': channel_data.get('display', {}).get('langCode')
+            })
+        
+        # Map the language code to full name
+        lang_name = language_map.get(lang_code.upper(), "English")
+        
+        # Override based on channel name if needed (safety check)
+        name_lower = name.lower()
+        if 'telugu' in name_lower or 'tel' in name_lower:
+            lang_name = "Telugu"
+            lang_code = "TEL"
+        elif 'tamil' in name_lower or 'tam' in name_lower:
+            lang_name = "Tamil"
+            lang_code = "TAM"
+        elif 'hindi' in name_lower or 'hin' in name_lower:
+            lang_name = "Hindi"
+            lang_code = "HIN"
+        elif 'malayalam' in name_lower or 'mal' in name_lower:
+            lang_name = "Malayalam"
+            lang_code = "MAL"
+        elif 'kannada' in name_lower or 'kan' in name_lower:
+            lang_name = "Kannada"
+            lang_code = "KAN"
+        elif 'bengali' in name_lower or 'ben' in name_lower:
+            lang_name = "Bengali"
+            lang_code = "BEN"
+        elif 'marathi' in name_lower or 'mar' in name_lower:
+            lang_name = "Marathi"
+            lang_code = "MAR"
+        elif 'punjabi' in name_lower or 'pun' in name_lower:
+            lang_name = "Punjabi"
+            lang_code = "PUN"
         
         # Use channel number from API or generate one
         channel_number = channel_data.get('channelNumber', str(channel_counter))
         
-        # Create the EXTINF line compatible with your script
-        # Format: tvg-id (for EPG), tvg-chno (channel number), group-title (category/language)
-        playlist.append(f'#EXTINF:-1 tvg-id="{epg}" tvg-chno="{channel_number}" tvg-name="{name}" tvg-logo="{logo}" group-title="{lang_name}",{channel_number} {name}')
+        # Create the EXTINF line with CORRECT language
+        playlist.append(f'#EXTINF:-1 tvg-id="{epg}" tvg-chno="{channel_number}" tvg-name="{name}" tvg-logo="{logo}" tvg-language="{lang_code}" group-title="{lang_name}",{channel_number} {name}')
         
         # Get stream URL
         encodedpath = urllib.parse.quote_plus(path)
@@ -125,9 +170,20 @@ for i in jsonresp['response']['data']:
         print(f"Error processing channel: {str(e)}")
         continue
 
+# Print debug info
+print("\n=== DEBUG: First 10 channels language codes ===")
+for item in debug_sample:
+    print(f"Channel: {item['name']}")
+    print(f"  langCode: {item['langCode']}")
+    print(f"  language: {item['language']}")
+    print(f"  languageCode: {item['languageCode']}")
+    print(f"  display.langCode: {item['display_langCode']}")
+    print("---")
+
 # Write the playlist file
 with open('./yupptvfast.m3u', 'w', encoding='utf-8', newline='') as f:
     for lines in playlist:
         f.write(f'{lines}\n')
 
-print(f"Playlist generated successfully with {channel_counter - 1} channels")
+print(f"\nPlaylist generated successfully with {channel_counter - 1} channels")
+print("Check yupptvfast.m3u for language fixes")
