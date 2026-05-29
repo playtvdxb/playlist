@@ -5,10 +5,12 @@ import time
 
 playlist = ["#EXTM3U"]
 
-# REMOVED: &display_lang_code=ENG from the URL below
+# Your worker URL
+WORKER_URL = "https://binsip.tvlive.workers.dev"
+
 resp = urllib3.request(
     "GET",
-    "https://yuppfast-api.revlet.net/service/api/v1/get/token?tenant_code=yuppfast&box_id=3b6f5839-0b53-aa06-7a80-023047a6357c&product=yuppfast&device_id=5&device_sub_type=Chrome,145.0.0.0,Windows&client_app_version=1&timezone=Asia/Calcutta",
+    "https://yuppfast-api.revlet.net/service/api/v1/get/token?tenant_code=yuppfast&box_id=3b6f5839-0b53-aa06-7a80-023047a6357c&product=yuppfast&device_id=5&display_lang_code=ENG&device_sub_type=Chrome,145.0.0.0,Windows&client_app_version=1&timezone=Asia/Calcutta",
     headers={
         "Accept": "application/json, text/plain, */*",
         "Accept-Encoding": "gzip, deflate, br, zstd",
@@ -61,7 +63,7 @@ def get_language(name):
 
 def get_category(name):
     name_lower = name.lower()
-    if any(word in name_lower for word in ['news', 'times now', 'aaj tak', 'republic', 'ndtv', 'abp', 'tv9', 'india today']):
+    if any(word in name_lower for word in ['news', 'times now', 'aaj tak', 'republic', 'ndtv', 'abp', 'tv9', 'india today', 'mirror now', 'wion', 'business', 'profit']):
         return "News"
     if any(word in name_lower for word in ['sports', 'sport', 'cricket', 'willow', 'fight', 'mma']):
         return "Sports"
@@ -86,36 +88,15 @@ for i in jsonresp['response']['data']:
     language = get_language(name)
     category = get_category(name)
     
-    if language == "English":
-        group_title = category
-    else:
+    # For News channels, add language prefix
+    if category == "News" and language != "English":
         group_title = f"{language} {category}"
-    
-    playlist.append(f'#EXTINF:-1 tvg-id="{epg}" tvg-chno="{epg}" tvg-name="{name}" tvg-logo="{logo}" group-title="{group_title}",{epg} {name}')
-    
-    encodedpath = urllib.parse.quote_plus(path)
-    resp = urllib3.request(
-        "GET",
-        f"https://yuppfast-api.revlet.net/service/api/v1/page/stream?path={encodedpath}",
-        headers={
-            "Accept": "application/json, text/plain, */*",
-            "Accept-Encoding": "gzip, deflate, br, zstd",
-            "Box-Id": "3b6f5839-0b53-aa06-7a80-023047a6357c",
-            "Tenant-Code": "yuppfast",
-            "Origin": "https://www.yupptv.com",
-            "Referer": "https://www.yupptv.com/",
-            "Session-Id": sessionid,
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/145.0.0.0 Safari/537.36"
-        }
-    )
-    stream = resp.json()
-    if stream['status'] == True:
-        for j in stream['response']['streams']:
-            streamlinks = []
-            streamlinks.append(j['url'])
-        playlist.append(streamlinks[0])
     else:
-        playlist.append('')
+        group_title = category
+    
+    # Use the worker's refresh endpoint to get fresh stream URLs
+    playlist.append(f'#EXTINF:-1 tvg-id="{epg}" tvg-chno="{epg}" tvg-name="{name}" tvg-logo="{logo}" group-title="{group_title}",{epg} {name}')
+    playlist.append(f'{WORKER_URL}/api/refresh-stream?id={epg}\n')
 
 with open('./yupptvfast.m3u', 'w', newline='') as f:
     for lines in playlist:
